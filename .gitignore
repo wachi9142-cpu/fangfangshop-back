@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+bun.lockb
+
+# env
+.env
+.env.local
+
+# database (SQLite)
+*.db
+*.db-journal
+prisma/*.db
+prisma/*.db-journal
+prisma/migrations/dev.db*
+
+# prisma generated client (regenerated on install)
+# keep migrations checked in, ignore generated client if placed in a custom dir
+src/generated/
+
+# build / logs
+dist/
+*.log
+.DS_Store

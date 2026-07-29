@@ -3,6 +3,8 @@
 Claude Code: อ่าน **[AGENTS.md](./AGENTS.md)** เป็นเอกสารหลักของ repo นี้
 
 สรุปสั้น: นี่คือ backend/API ของ Fang Fang Shop (เว็บแอปมือถือแสดงสินค้า/ราคา/สต็อกของร้านของชำ)
-**repo นี้ยังว่าง ยังไม่มีโค้ด** — งานคือสร้าง backend ใหม่เพื่อรองรับ catalog สินค้า,
-อัปเดตสต็อก, และล็อกอินพนักงานแบบง่าย ให้ยึด `type Product` จากฝั่ง frontend (`../fangfangshop`)
-เป็น contract ของข้อมูล
+Stack: **Node + Hono + Prisma + SQLite** (รันด้วย `tsx`) — API ใช้งานได้แล้ว
+มี CRUD สินค้า + ล็อกอินพนักงานแบบง่าย (token HMAC) ยึด `type Product` จากฝั่ง frontend
+(`../fangfangshop`) เป็น contract ของข้อมูล
+
+รัน: `npm install` → `cp .env.example .env` → `npm run db:migrate` → `npm run dev` (พอร์ต 4000)

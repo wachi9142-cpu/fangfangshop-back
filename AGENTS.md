@@ -29,21 +29,59 @@ Backend นี้มีหน้าที่ให้บริการข้อ
 
 ## 2. สถานะปัจจุบัน (Current state — สำคัญมาก)
 
-⚠️ **repo นี้ยังว่างเปล่า** — มีแค่ README เดิมและไฟล์เอกสารนี้ ยังไม่มีโค้ดใดๆ
+**API ใช้งานได้จริงแล้ว** — รันได้, migrate + seed แล้ว, ทดสอบทุก endpoint ผ่าน
 
-ฝั่ง frontend ตอนนี้ยัง **ไม่ได้เชื่อม backend** — ข้อมูลสินค้าถูก hardcode ไว้ใน
-`app/page.tsx` และ persist ผ่าน `localStorage` ของเบราว์เซอร์เท่านั้น
+สิ่งที่ **มีแล้ว**:
 
-ดังนั้นงานของ repo นี้คือ **สร้าง backend ขึ้นมาใหม่ตั้งแต่ต้น** เพื่อ:
+- ✅ Hono app + CORS + logger + health check (`src/app.ts`)
+- ✅ Prisma + SQLite, schema `Product` ตรงกับ contract ฝั่ง frontend (`prisma/schema.prisma`)
+- ✅ seed ข้อมูลตัวอย่าง 21 รายการ (`prisma/seed.ts`)
+- ✅ ล็อกอินแบบง่าย + token HMAC-SHA256 แบบ stateless (`src/auth.ts`)
+- ✅ CRUD สินค้า + validate + คำนวณ `status` ให้ (`src/routes/products.ts`)
 
-1. ย้ายข้อมูลสินค้าจาก hardcode/localStorage มาเป็นฐานข้อมูลจริง + API
-2. เปิด API ให้ frontend ดึงรายการสินค้า/ราคา/สต็อก
-3. เปิด API ให้พนักงานที่ล็อกอินแล้วอัปเดตสต็อก/ราคา/สินค้า
-4. ระบบล็อกอิน username/password แบบง่าย
+สิ่งที่ **ยังไม่มี**:
 
-> ยังไม่ได้เลือก tech stack ของ backend — เมื่อจะเริ่ม ให้ถามเจ้าของโปรเจกต์
-> หรือเสนอทางเลือกที่เข้ากับ frontend (Next.js/TypeScript) เช่น Next.js API routes,
-> Node/Express, หรือ backend อื่นที่ทีมถนัด แล้วบันทึกการตัดสินใจไว้ในไฟล์นี้
+- ❌ catalog เต็ม (300+ รายการ) — ตอนนี้ seed แค่ 21 รายการตัวแทน
+  ของจริงยัง hardcode อยู่ใน `../fangfangshop/app/page.tsx`
+- ❌ บัญชีพนักงานเก็บใน DB + hash รหัสผ่าน (ตอนนี้ hardcode ใน `src/auth.ts` ตามที่ตั้งใจให้ง่าย)
+- ❌ อัปโหลดรูปจริง (ตอนนี้เก็บเป็น URL/data URL string)
+
+---
+
+## 2.1 Tech stack & วิธีรัน
+
+**Node + Hono + Prisma + SQLite** (TypeScript ล้วน ไม่ต้องตั้ง DB server แยก)
+
+> เดิมเขียนไว้สำหรับ Bun แต่เครื่อง dev ไม่มี Bun จึงย้ายมารันบน **Node ผ่าน `tsx`**
+> และใช้ `@hono/node-server` — `src/index.ts` ยัง `export default { port, fetch }` ไว้
+> เผื่อรันด้วย Bun ได้เหมือนเดิม
+
+```bash
+npm install
+cp .env.example .env
+npm run db:migrate   # สร้างตาราง + seed อัตโนมัติ
+npm run dev          # http://localhost:4000 (watch mode)
+```
+
+> ⚠️ npm 11 บล็อก install script โดย default — ถ้า prisma/esbuild ไม่ทำงาน
+> ให้รัน `npm approve-scripts @prisma/client prisma @prisma/engines esbuild` แล้ว install ใหม่
+
+โครงสร้างไฟล์:
+
+```
+src/
+├── index.ts          ← entry point (serve ด้วย @hono/node-server)
+├── app.ts            ← ประกอบ Hono app + middleware + route
+├── env.ts            ← รวมค่า config จาก environment
+├── db.ts             ← Prisma client (singleton)
+├── auth.ts           ← บัญชีพนักงาน, สร้าง/ตรวจ token, middleware requireAuth
+└── routes/
+    ├── auth.ts       ← POST /auth/login, GET /auth/me
+    └── products.ts   ← CRUD /products
+prisma/
+├── schema.prisma
+└── seed.ts
+```
 
 ---
 
@@ -70,12 +108,25 @@ type Product = {
 
 สถานะสต็อกคำนวณจาก `stock` เทียบ `minStock`: `พร้อมขาย` / `ใกล้หมด` / `หมด`
 
-API ที่ backend ควรมี (ข้อเสนอเริ่มต้น):
+> หมายเหตุ: schema ฝั่ง backend **ไม่มี** `shelf` และ `isPlaceholder`
+> (`shelf` ไม่ได้ใช้จริงในหน้าเว็บ, `isPlaceholder` เป็นเรื่องของ UI ล้วนๆ)
 
-- `GET  /products` — รายการสินค้าทั้งหมด (สำหรับทุกคน)
-- `POST /auth/login` — ล็อกอินพนักงาน (username/password) → คืน token/session ง่ายๆ
-- `POST /products` — เพิ่มสินค้า (ต้องล็อกอิน)
-- `PATCH /products/:id` — แก้สต็อก/ราคา/ข้อมูลสินค้า (ต้องล็อกอิน)
+API ที่มีจริงตอนนี้:
+
+| Method | Path | สิทธิ์ | หน้าที่ |
+|--------|------|--------|---------|
+| GET | `/` | ทุกคน | health check |
+| GET | `/products` | ทุกคน | รายการสินค้า (`?category=` `?q=` `?status=`) |
+| GET | `/products/:id` | ทุกคน | สินค้ารายตัว |
+| POST | `/auth/login` | ทุกคน | ล็อกอิน → `{ token, user }` |
+| GET | `/auth/me` | มี token | ตรวจสถานะล็อกอิน |
+| POST | `/products` | ต้องล็อกอิน | เพิ่มสินค้า |
+| PATCH | `/products/:id` | ต้องล็อกอิน | แก้สต็อก/ราคา/ข้อมูล |
+| DELETE | `/products/:id` | ต้องล็อกอิน | ลบสินค้า |
+
+- ทุก response ของสินค้าจะมี field `status` ที่คำนวณมาให้แล้ว (frontend ไม่ต้องคำนวณเอง)
+- บัญชีทดสอบ: `owner` / `1234`, `staff` / `1234`
+- ส่ง token ผ่าน header `Authorization: Bearer <token>`
 
 ---
 
@@ -93,4 +144,4 @@ API ที่ backend ควรมี (ข้อเสนอเริ่มต�
 | Repo | หน้าที่ |
 |------|---------|
 | `fangfangshop` | Frontend (Next.js + Ant Design) — mobile web app |
-| `fangfangshop-back` | Backend / API (repo นี้ — ยังไม่เริ่มพัฒนา) |
+| `fangfangshop-back` | Backend / API (repo นี้ — Node + Hono + Prisma + SQLite) |

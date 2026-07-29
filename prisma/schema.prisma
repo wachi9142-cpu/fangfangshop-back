@@ -1,0 +1,31 @@
+// Prisma schema สำหรับ Fang Fang Shop backend
+// ยึด field ให้ตรงกับ `type Product` ฝั่ง frontend (../fangfangshop/app/page.tsx)
+// เพื่อไม่ต้องแปลงข้อมูลไปมา
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// สินค้าในร้าน — ตรงกับ contract ฝั่ง frontend
+model Product {
+  id        Int      @id @default(autoincrement())
+  name      String // ชื่อสินค้า (ภาษาไทย)
+  category  String // หมวดหมู่
+  stock     Int      @default(0) // จำนวนคงเหลือ
+  minStock  Int      @default(0) // เกณฑ์ "ใกล้หมด"
+  unit      String // หน่วย เช่น ขวด / ซอง / กระป๋อง
+  price     Int      @default(0) // ราคา (0 = ยังไม่ตั้งราคา ไม่ได้แปลว่าฟรี)
+  updatedBy String   @default("") // ใครอัปเดตล่าสุด
+  sizeLabel String? // ป้ายขนาด เช่น "ขวดเล็ก"
+  imageUrl  String? // URL รูปสินค้า
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([name])
+}
