@@ -1,0 +1,20 @@
+{
+  "name": "fangfangshop-back",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "db:init": "bun src/db-init.ts",
+    "db:seed": "bun src/seed.ts",
+    "db:setup": "bun src/db-init.ts && bun src/seed.ts"
+  },
+  "dependencies": {
+    "hono": "^4.6.14",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14"
+  }
+}

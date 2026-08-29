@@ -27,23 +27,47 @@ Backend นี้มีหน้าที่ให้บริการข้อ
 
 ---
 
-## 2. สถานะปัจจุบัน (Current state — สำคัญมาก)
+## 2. สถานะปัจจุบัน (Current state)
 
-⚠️ **repo นี้ยังว่างเปล่า** — มีแค่ README เดิมและไฟล์เอกสารนี้ ยังไม่มีโค้ดใดๆ
+✅ **backend สร้างเสร็จแล้วและเชื่อมกับ frontend เรียบร้อย**
 
-ฝั่ง frontend ตอนนี้ยัง **ไม่ได้เชื่อม backend** — ข้อมูลสินค้าถูก hardcode ไว้ใน
-`app/page.tsx` และ persist ผ่าน `localStorage` ของเบราว์เซอร์เท่านั้น
+- **Stack:** Bun + Hono + PostgreSQL (ไคลเอนต์ DB ใช้ `postgres.js`)
+- **Data:** ย้าย catalog จริง 414 รายการจาก frontend มาเก็บใน Postgres แล้ว
+  (seed มาจาก `src/seed-products.json` ที่ export จาก catalog ของ frontend)
+- **Auth:** ล็อกอิน username/password แบบง่าย → คืน token (เก็บเป็น session ในตาราง)
+- **Frontend:** `../fangfangshop` เรียก API ผ่าน `app/api.ts` (ตั้งค่า URL ที่ `.env.local`)
 
-ดังนั้นงานของ repo นี้คือ **สร้าง backend ขึ้นมาใหม่ตั้งแต่ต้น** เพื่อ:
+> ⚠️ **หมายเหตุความปลอดภัย (ยอมรับได้สำหรับร้านเล็ก แต่ควรรู้):** token ยังไม่มีวันหมดอายุ,
+> ยังไม่มี rate-limit. ถ้าจะขึ้น production จริงควรเพิ่มส่วนนี้และเปลี่ยนรหัสผ่านเริ่มต้น
 
-1. ย้ายข้อมูลสินค้าจาก hardcode/localStorage มาเป็นฐานข้อมูลจริง + API
-2. เปิด API ให้ frontend ดึงรายการสินค้า/ราคา/สต็อก
-3. เปิด API ให้พนักงานที่ล็อกอินแล้วอัปเดตสต็อก/ราคา/สินค้า
-4. ระบบล็อกอิน username/password แบบง่าย
+### สถาปัตยกรรมโดยย่อ
 
-> ยังไม่ได้เลือก tech stack ของ backend — เมื่อจะเริ่ม ให้ถามเจ้าของโปรเจกต์
-> หรือเสนอทางเลือกที่เข้ากับ frontend (Next.js/TypeScript) เช่น Next.js API routes,
-> Node/Express, หรือ backend อื่นที่ทีมถนัด แล้วบันทึกการตัดสินใจไว้ในไฟล์นี้
+```
+Browser ── GET /products (ทุกคน) ─────────────┐
+        ── POST /auth/login → token           │
+        ── POST /products     (Bearer token)  ├──►  Hono (Bun)  ──►  PostgreSQL
+        ── PATCH /products/:id (Bearer token) ┘         (fangfangshop DB)
+```
+
+### ไฟล์สำคัญ
+
+| ไฟล์ | หน้าที่ |
+|------|---------|
+| `src/index.ts`   | Hono app + ทุก endpoint + auth middleware + CORS |
+| `src/db.ts`      | เชื่อม Postgres (postgres.js) + แปลง row → `Product` |
+| `src/db-init.ts` | สร้างตาราง products/users/sessions + บัญชีพนักงานเริ่มต้น |
+| `src/seed.ts`    | นำเข้า catalog จาก `seed-products.json` (upsert ตาม id) |
+| `.env`           | `DATABASE_URL`, `PORT`, `CORS_ORIGIN` (อยู่ใน .gitignore) |
+
+### วิธีรัน
+
+```bash
+bun install
+bun run db:setup   # สร้างตาราง + บัญชีเริ่มต้น + seed สินค้า (รันครั้งแรกครั้งเดียว)
+bun run dev        # เปิด API ที่ http://localhost:4001 (watch mode)
+```
+
+บัญชีทดสอบ: `owner` / `1234` (เจ้าของร้าน), `staff` / `1234` (พนักงานขาย)
 
 ---
 
@@ -70,12 +94,15 @@ type Product = {
 
 สถานะสต็อกคำนวณจาก `stock` เทียบ `minStock`: `พร้อมขาย` / `ใกล้หมด` / `หมด`
 
-API ที่ backend ควรมี (ข้อเสนอเริ่มต้น):
+> หมายเหตุ: `shelf` อยู่ในสเปกเดิมแต่ frontend/DB ปัจจุบัน **ไม่ได้ใช้** — จึงไม่มีในตาราง
 
-- `GET  /products` — รายการสินค้าทั้งหมด (สำหรับทุกคน)
-- `POST /auth/login` — ล็อกอินพนักงาน (username/password) → คืน token/session ง่ายๆ
-- `POST /products` — เพิ่มสินค้า (ต้องล็อกอิน)
-- `PATCH /products/:id` — แก้สต็อก/ราคา/ข้อมูลสินค้า (ต้องล็อกอิน)
+Endpoint จริงที่มีตอนนี้:
+
+- `GET   /products` — รายการสินค้าทั้งหมด (สำหรับทุกคน)
+- `POST  /auth/login` — ล็อกอิน (username/password) → `{ token, username, displayName }`
+- `POST  /auth/logout` — ลบ session (ส่ง `Authorization: Bearer <token>`)
+- `POST  /products` — เพิ่มสินค้า (ต้องล็อกอิน) — id สร้างอัตโนมัติจาก sequence
+- `PATCH /products/:id` — แก้สต็อก/ราคา/ข้อมูล (ต้องล็อกอิน) — ส่งเฉพาะ field ที่จะแก้
 
 ---
 
