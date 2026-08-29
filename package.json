@@ -8,6 +8,7 @@
     "start": "bun src/index.ts",
     "db:init": "bun src/db-init.ts",
     "db:seed": "bun src/seed.ts",
+    "build": "bun build src/index.ts --compile --minify --outfile dist/fangfangshop-back",
     "db:setup": "bun src/db-init.ts && bun src/seed.ts"
   },
   "dependencies": {
